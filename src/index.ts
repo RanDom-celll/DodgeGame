@@ -49,17 +49,12 @@ const TICK_RATE = 20;
 const DT = 1 / TICK_RATE;
 
 setInterval(() => {
-  // Update player positions
   for (const player of Object.values(players)) {
     player.x += player.vx * DT;
     player.y += player.vy * DT;
-
-    // Keep inside arena bounds
     player.x = Math.max(0, Math.min(800, player.x));
     player.y = Math.max(0, Math.min(600, player.y));
   }
-
-  // Broadcast state
   io.emit("state", { players: Object.values(players) });
 }, 1000 / TICK_RATE);
 
