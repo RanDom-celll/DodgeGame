@@ -3,7 +3,7 @@ import { GameCanvas } from "./components/GameCanvas";
 
 function App() {
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: 20 }}>
+    <div className="flex bg-black backdrop-blur-sm justify-center">
       <GameCanvas />
     </div>
   );

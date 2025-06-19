@@ -14,38 +14,47 @@ interface Player {
   y: number;
   vx: number;
   vy: number;
-  skin:string;
+  skin: string;
+  shieldUntil: number;
+  freezeUntil: number;
+  slowUntil: number;
 }
-
+type ObjectKind = "block" | "shield" | "freeze" | "slow";
 interface FallingObject {
   id: string;
   x: number;
   y: number;
   vy: number;
+  type: ObjectKind;
 }
 
 const players: Record<string, Player> = {};
 const objects: Record<string, FallingObject> = {};
+const powerupTypes: ObjectKind[] = ["shield", "freeze", "slow"];
 
-
-const ARENA_WIDTH = 800;
+const poweUpTime = 0.1;
+const ARENA_WIDTH = 1024;
 const ARENA_HEIGHT = 600;
-const TICK_RATE = 20;           
-const DT = 1 / TICK_RATE;      
-const SPAWN_INTERVAL = 500;    
-const GRAVITY = 800;           
+const TICK_RATE = 20;
+const DT = 1 / TICK_RATE;
+const SPAWN_INTERVAL = 500;
+const GRAVITY = 800;
+const skinList = ["knight", "bird"];
 let lastSpawn = Date.now();
-
 
 io.on("connection", (socket) => {
   console.log("New player:", socket.id);
+  const randomSkin = skinList[Math.floor(Math.random() * skinList.length)];
   players[socket.id] = {
     id: socket.id,
     x: Math.random() * ARENA_WIDTH,
     y: ARENA_HEIGHT - 50,
     vx: 0,
     vy: 0,
-    skin:"knight"
+    skin: randomSkin,
+    shieldUntil: 0,
+    freezeUntil: 0,
+    slowUntil: 0,
   };
 
   socket.on("input", (data: { dx: number; dy: number }) => {
@@ -63,16 +72,17 @@ io.on("connection", (socket) => {
   });
 });
 
-
 setInterval(() => {
   const now = Date.now();
 
   if (now - lastSpawn >= SPAWN_INTERVAL) {
+    const pu = Math.random() < poweUpTime;
     const obj: FallingObject = {
       id: uuid(),
       x: Math.random() * ARENA_WIDTH,
       y: 0,
       vy: 0,
+      type: pu ? powerupTypes[Math.floor(Math.random()*powerupTypes.length)] : "block",
     };
     objects[obj.id] = obj;
     lastSpawn = now;
@@ -84,10 +94,18 @@ setInterval(() => {
   }
 
   for (const p of Object.values(players)) {
-    p.x = Math.max(0, Math.min(ARENA_WIDTH, p.x + p.vx * DT));
-    p.y = Math.max(0, Math.min(ARENA_HEIGHT, p.y + p.vy * DT));
+    const now = Date.now();
+    if (now < p.freezeUntil) {
+      p.vx = 0;
+      p.vy = 0;
+      continue;
+    }
+    const speedMultiplier = now < p.slowUntil ? 0.5 : 1;
+    p.x += p.vx * DT * speedMultiplier;
+    p.y += p.vy * DT * speedMultiplier;
+    p.x = Math.max(0, Math.min(ARENA_WIDTH, p.x));
+    p.y = Math.max(0, Math.min(ARENA_HEIGHT, p.y));
   }
-
   const toRemoveObjs = new Set<string>();
   const toRemovePlayers = new Set<string>();
   const size = 32;
@@ -102,10 +120,51 @@ setInterval(() => {
         p.x < obj.x + size &&
         p.x + size > obj.x &&
         p.y < obj.y + size &&
-        p.y + size > obj.y
+        p.y + size > obj.y &&
+        obj.type === "block"
       ) {
-        toRemovePlayers.add(p.id);
+        if (Date.now() > p.shieldUntil) {
+          toRemovePlayers.add(p.id);
+        }
         toRemoveObjs.add(obj.id);
+      } else if (
+        p.x < obj.x + size &&
+        p.x + size > obj.x &&
+        p.y < obj.y + size &&
+        p.y + size > obj.y &&
+        obj.type === "shield"
+      ) {
+        p.shieldUntil = Date.now() + 5000;
+        break;
+      } else if (
+        p.x < obj.x + size &&
+        p.x + size > obj.x &&
+        p.y < obj.y + size &&
+        p.y + size > obj.y &&
+        obj.type === "freeze"
+      ) {
+        for (const others of Object.values(players)) {
+          if (others.id != p.id) {
+            others.freezeUntil = Date.now() + 5000;
+          }
+        }
+        toRemoveObjs.add(obj.id);
+        break;
+      }
+       else if (
+        p.x < obj.x + size &&
+        p.x + size > obj.x &&
+        p.y < obj.y + size &&
+        p.y + size > obj.y &&
+        obj.type === "slow"
+      ) {
+        for (const others of Object.values(players)) {
+          if (others.id != p.id) {
+            others.slowUntil = Date.now() + 5000;
+          }
+        }
+        toRemoveObjs.add(obj.id);
+        break;
       }
     }
   }
