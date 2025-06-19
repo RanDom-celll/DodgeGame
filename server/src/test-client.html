@@ -19,6 +19,8 @@
       const ctx = canvas.getContext("2d");
 
       let players = [];
+      let objects = [];
+
       const keys = { ArrowLeft: 0, ArrowRight: 0, ArrowUp: 0, ArrowDown: 0 };
 
       document.addEventListener("keydown", (e) => {
@@ -42,11 +44,17 @@
       }
       socket.on("state", (data) => {
         players = data.players;
+        objects = data.objects;
+        // console.log("state update:", players.length, objects.length);
         draw();
       });
 
       function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (const o of objects) {
+          ctx.fillStyle = "black";
+          ctx.fillRect(o.x, o.y, 32, 32);
+        }
         for (const p of players) {
           ctx.fillStyle = p.id === socket.id ? "red" : "blue";
           ctx.fillRect(p.x, p.y, 32, 32);
