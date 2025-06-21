@@ -7,10 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "host": "vite --host",
     "preview": "vite preview"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.10",
+    "lucide-react": "^0.522.0",
+    "phaser": "^3.90.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "socket.io-client": "^4.8.1",

@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
+import { Maximize, Minimize, Users, Trophy, Zap, Gamepad2, GamepadIcon } from "lucide-react";
 
 interface Player {
   id: string;
@@ -33,24 +34,52 @@ interface GameState {
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const gameContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const animationRef = useRef<number | null>(null);
-
   const [gameState, setGameState] = useState<GameState>({
     players: [],
     objects: [],
     gameTime: 0,
   });
-
   const [gameSize, setGameSize] = useState({ width: 800, height: 600 });
   const [playerId, setPlayerId] = useState<string>("");
   const [connected, setConnected] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [tooShort, setTooShort] = useState(false);
   const [keys, setKeys] = useState({
     left: false,
     right: false,
     up: false,
     down: false,
   });
+  
+  const alivePlayers = gameState.players.filter((p) => p.alive);
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      gameContainerRef.current?.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch((err) => {
+        console.error("Error attempting to enable fullscreen:", err);
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+      }).catch((err) => {
+        console.error("Error attempting to exit fullscreen:", err);
+      });
+    }
+  }, []);
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     const socket = io("http://localhost:3000");
@@ -76,7 +105,12 @@ export default function GameCanvas() {
       socket.disconnect();
     };
   }, []);
-
+  useEffect(() => {
+    const checkSize = () => setTooShort(window.innerHeight < 890);
+    window.addEventListener("resize", checkSize);
+    checkSize();
+    return () => window.removeEventListener("resize", checkSize);
+  }, []);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const newKeys = { ...keys };
@@ -103,6 +137,10 @@ export default function GameCanvas() {
           if (myPlayer && !myPlayer.alive) {
             socketRef.current?.emit("respawn");
           }
+          break;
+        case "F11":
+          e.preventDefault();
+          toggleFullscreen();
           break;
       }
       setKeys(newKeys);
@@ -138,12 +176,14 @@ export default function GameCanvas() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [keys, gameState.players, playerId]);
+  }, [keys, gameState.players, playerId, toggleFullscreen]);
+
   useEffect(() => {
     if (socketRef.current && connected) {
       socketRef.current.emit("input", keys);
     }
   }, [keys, connected]);
+
   const drawPlayer = useCallback(
     (ctx: CanvasRenderingContext2D, player: Player, currentTime: number) => {
       const { x, y, skin, alive, shieldUntil, freezeUntil, slowUntil } = player;
@@ -155,6 +195,7 @@ export default function GameCanvas() {
         ctx.globalAlpha = 1;
         return;
       }
+
       switch (skin) {
         case "knight":
           ctx.fillStyle = "#4a5568";
@@ -181,6 +222,7 @@ export default function GameCanvas() {
           ctx.fillRect(x + 8, y + 8, 16, 16);
           break;
       }
+
       if (currentTime < shieldUntil) {
         ctx.strokeStyle = "#48bb78";
         ctx.lineWidth = 3;
@@ -283,63 +325,164 @@ export default function GameCanvas() {
   const isAlive = myPlayer?.alive ?? false;
 
   return (
-    <div className="flex w-full   overflow-x-hidden overflow-y-hidden flex-col items-center justify-center min-h-screen bg-gray-900 p-4">
-      <div className="bg-gray-800 rounded-lg p-6 shadow-2xl">
-        <div className="mb-4 text-center">
-          <h1 className="text-3xl font-bold text-white mb-2">DODGE MASTER</h1>
-          <div className="flex gap-4 text-sm">
-            <div className="text-green-400">
-              Score: {Math.floor(myPlayer?.score ?? 0)}
+    <div 
+      ref={gameContainerRef}
+      className={`flex w-full h-screen bg-gradient-to-br from-gray-800/50 to-gray-900/50 ${
+        isFullscreen ? 'p-2' : 'p-4'
+      }`}
+    >
+      {tooShort ?        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            background: "#fffae6",
+            color: "#665c00",
+            padding: "8px 16px",
+            fontSize: 14,
+            zIndex: 1000,
+            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+          }}
+        >
+          ⚠️ Window height is too low. For the best experience, consider zooming out.
+        </div> : ""}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{top: '20%', left: '10%'}} />
+        <div className="absolute w-1 h-1 bg-purple-400 rounded-full animate-pulse" style={{top: '60%', left: '80%'}} />
+        <div className="absolute w-3 h-3 bg-green-400 rounded-full animate-pulse" style={{top: '80%', left: '20%'}} />
+        <div className="absolute w-1 h-1 bg-yellow-400 rounded-full animate-pulse" style={{top: '30%', left: '70%'}} />
+      </div>
+
+      <div className="relative z-10 w-full max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <GamepadIcon className="w-8 h-8 text-purple-400" />
+            <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 tracking-wider">
+              DODGE MASTER
+            </h1>
+            <GamepadIcon className="w-8 h-8 text-purple-400" />
+          </div>
+          <div className="text-gray-300 text-lg font-medium">
+            The Ultimate Survival Challenge
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 rounded-xl p-4 text-center backdrop-blur-sm">
+            <Trophy className="w-6 h-6 mx-auto mb-2 text-green-400" />
+            <div className="text-green-400 font-bold text-xl">
+              {Math.floor(myPlayer?.score ?? 0)}
             </div>
-            <div className="text-blue-400">
-              Players: {gameState.players.filter((p) => p.alive).length}
+            <div className="text-gray-300 text-sm">Score</div>
+          </div>
+          
+          <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-xl p-4 text-center backdrop-blur-sm">
+            <Users className="w-6 h-6 mx-auto mb-2 text-blue-400" />
+            <div className="text-blue-400 font-bold text-xl">
+              {alivePlayers.length}
             </div>
-            <div className={`${connected ? "text-green-400" : "text-red-400"}`}>
-              {connected ? "Connected" : "Disconnected"}
+            <div className="text-gray-300 text-sm">Alive</div>
+          </div>
+          
+          <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-xl p-4 text-center backdrop-blur-sm">
+            <Zap className="w-6 h-6 mx-auto mb-2 text-purple-400" />
+            <div className="text-purple-400 font-bold text-xl">
+              {gameState.objects.length}
             </div>
+            <div className="text-gray-300 text-sm">Objects</div>
+          </div>
+          
+          <div className={`bg-gradient-to-br ${connected ? 'from-green-500/20 to-green-600/20 border-green-500/30' : 'from-red-500/20 to-red-600/20 border-red-500/30'} border rounded-xl p-4 text-center backdrop-blur-sm`}>
+            <div className={`w-4 h-4 rounded-full mx-auto mb-2 ${connected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+            <div className={`font-bold text-lg ${connected ? 'text-green-400' : 'text-red-400'}`}>
+              {connected ? 'ONLINE' : 'OFFLINE'}
+            </div>
+            <div className="text-gray-300 text-sm">Status</div>
+          </div>
+          
+          <div className="bg-gradient-to-br from-gray-500/20 to-gray-600/20 border border-gray-500/30 rounded-xl p-4 text-center backdrop-blur-sm">
+            <button
+              onClick={toggleFullscreen}
+              className="w-full h-full flex flex-col items-center justify-center hover:scale-105 transition-transform"
+            >
+              {isFullscreen ? (
+                <Minimize className="w-6 h-6 text-white mb-2" />
+              ) : (
+                <Maximize className="w-6 h-6 text-white mb-2" />
+              )}
+              <div className="text-white font-bold text-lg">
+                {isFullscreen ? 'EXIT' : 'FULL'}
+              </div>
+              <div className="text-gray-300 text-sm">Screen</div>
+            </button>
           </div>
         </div>
 
-        <div className="relative">
+        <div className="relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 backdrop-blur-sm border border-gray-700/50">
           <canvas
             ref={canvasRef}
             width={gameSize.width}
             height={gameSize.height}
-            className="border-2 border-gray-600 bg-gray-900"
+            className="border-2 border-gray-500/50 bg-gray-900 rounded-lg shadow-2xl mx-auto block"
           />
 
           {!isAlive && (
-            <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center">
+            <div className="absolute inset-6 bg-black/80 backdrop-blur-sm flex items-center justify-center rounded-lg">
               <div className="text-center text-white">
-                <h2 className="text-2xl font-bold mb-2">GAME OVER</h2>
-                <p className="mb-4">
-                  Final Score: {Math.floor(myPlayer?.score ?? 0)}
-                </p>
-                <p className="text-sm text-gray-300">Press SPACE to respawn</p>
+                <div className="text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-purple-400">
+                  GAME OVER
+                </div>
+                <div className="text-2xl mb-6 text-gray-300">
+                  Final Score: <span className="text-yellow-400 font-bold">{Math.floor(myPlayer?.score ?? 0)}</span>
+                </div>
+                <div className="text-lg text-gray-400 animate-pulse">
+                  Press <span className="bg-gray-700 px-2 py-1 rounded font-mono">SPACE</span> to respawn
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        <div className="mt-4 text-center text-sm text-gray-400">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h3 className="font-semibold text-white mb-2">Controls</h3>
-              <p>WASD or Arrow Keys to move</p>
-              <p>SPACE to respawn when dead</p>
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 backdrop-blur-sm border border-gray-700/50">
+            <h3 className="font-bold text-white mb-4 text-xl flex items-center gap-2">
+              <Gamepad2 className="w-5 h-5" />
+              Controls
+            </h3>
+            <div className="space-y-2 text-gray-300">
+              <div className="flex justify-between">
+                <span>Movement:</span>
+                <span className="font-mono bg-gray-700 px-2 py-1 rounded text-sm">WASD / Arrow Keys</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Respawn:</span>
+                <span className="font-mono bg-gray-700 px-2 py-1 rounded text-sm">SPACE</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Fullscreen:</span>
+                <span className="font-mono bg-gray-700 px-2 py-1 rounded text-sm">F11</span>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-white mb-2">Power-ups</h3>
-              <div className="text-xs">
-                <p>
-                  <span className="text-green-400">Green:</span> Shield
-                </p>
-                <p>
-                  <span className="text-blue-400">Blue:</span> Freeze others
-                </p>
-                <p>
-                  <span className="text-yellow-400">Yellow:</span> Slow others
-                </p>
+          </div>
+          
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 backdrop-blur-sm border border-gray-700/50">
+            <h3 className="font-bold text-white mb-4 text-xl flex items-center gap-2">
+              <Zap className="w-5 h-5" />
+              Power-ups
+            </h3>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 bg-green-400 rounded"></div>
+                <span className="text-gray-300">Shield Protection</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 bg-blue-400 rounded"></div>
+                <span className="text-gray-300">Freeze Others</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 bg-yellow-400 rounded"></div>
+                <span className="text-gray-300">Slow Others</span>
               </div>
             </div>
           </div>
