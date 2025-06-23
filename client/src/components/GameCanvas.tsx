@@ -1,6 +1,14 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
-import { Maximize, Minimize, Users, Trophy, Zap, Gamepad2, GamepadIcon } from "lucide-react";
+import {
+  Maximize,
+  Minimize,
+  Users,
+  Trophy,
+  Zap,
+  Gamepad2,
+  GamepadIcon,
+} from "lucide-react";
 
 interface Player {
   id: string;
@@ -32,7 +40,13 @@ interface GameState {
   gameTime: number;
 }
 
-export default function GameCanvas() {
+interface Props {
+  socket: Socket;
+  roomCode: string;
+}
+
+export default function GameCanvas({ socket, roomCode }: Props) {
+  console.log("[GameCanvas] mount:", { roomCode, socketId: socket.id });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -53,21 +67,27 @@ export default function GameCanvas() {
     up: false,
     down: false,
   });
-  
+
   const alivePlayers = gameState.players.filter((p) => p.alive);
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
-      gameContainerRef.current?.requestFullscreen().then(() => {
-        setIsFullscreen(true);
-      }).catch((err) => {
-        console.error("Error attempting to enable fullscreen:", err);
-      });
+      gameContainerRef.current
+        ?.requestFullscreen()
+        .then(() => {
+          setIsFullscreen(true);
+        })
+        .catch((err) => {
+          console.error("Error attempting to enable fullscreen:", err);
+        });
     } else {
-      document.exitFullscreen().then(() => {
-        setIsFullscreen(false);
-      }).catch((err) => {
-        console.error("Error attempting to exit fullscreen:", err);
-      });
+      document
+        .exitFullscreen()
+        .then(() => {
+          setIsFullscreen(false);
+        })
+        .catch((err) => {
+          console.error("Error attempting to exit fullscreen:", err);
+        });
     }
   }, []);
   useEffect(() => {
@@ -75,36 +95,45 @@ export default function GameCanvas() {
       setIsFullscreen(!!document.fullscreenElement);
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, []);
 
   useEffect(() => {
-    const socket = io("http://localhost:3000");
+    console.log("[GameCanvas] setting up socket listeners");
     socketRef.current = socket;
-
-    socket.on("connect", () => {
-      setConnected(true);
-    });
 
     socket.on(
       "gameInit",
       (data: { width: number; height: number; playerId: string }) => {
+         console.log("[GameCanvas] gameInit:", data);
         setGameSize({ width: data.width, height: data.height });
         setPlayerId(data.playerId);
       }
     );
 
     socket.on("gameState", (state: GameState) => {
+      console.log("[GameCanvas] gameState t ick:", state);
       setGameState(state);
     });
+  socket.emit(
+    "join",
+    roomCode,
+    (res: { success: boolean; message?: string }) => {
+      if (!res.success) {
+        alert("Join failed: " + res.message);
+      }
+    }
+  );
 
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
+
+  return () => {
+    socket.off("gameInit");
+    socket.off("gameState");
+  };
+  }, [socket]);
   useEffect(() => {
     const checkSize = () => setTooShort(window.innerHeight < 890);
     window.addEventListener("resize", checkSize);
@@ -179,10 +208,8 @@ export default function GameCanvas() {
   }, [keys, gameState.players, playerId, toggleFullscreen]);
 
   useEffect(() => {
-    if (socketRef.current && connected) {
-      socketRef.current.emit("input", keys);
-    }
-  }, [keys, connected]);
+    socket.emit("input", roomCode, keys);
+  }, [keys]);
 
   const drawPlayer = useCallback(
     (ctx: CanvasRenderingContext2D, player: Player, currentTime: number) => {
@@ -325,13 +352,14 @@ export default function GameCanvas() {
   const isAlive = myPlayer?.alive ?? false;
 
   return (
-    <div 
+    <div
       ref={gameContainerRef}
       className={`flex w-full h-screen bg-gradient-to-br from-gray-800/50 to-gray-900/50 ${
-        isFullscreen ? 'p-2' : 'p-4'
+        isFullscreen ? "p-2" : "p-4"
       }`}
     >
-      {tooShort ?        <div
+      {tooShort ? (
+        <div
           style={{
             position: "fixed",
             top: 0,
@@ -345,17 +373,32 @@ export default function GameCanvas() {
             boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
           }}
         >
-          ⚠️ Window height is too low. For the best experience, consider zooming out.
-        </div> : ""}
+          ⚠️ Window height is too low. For the best experience, consider zooming
+          out.
+        </div>
+      ) : (
+        ""
+      )}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{top: '20%', left: '10%'}} />
-        <div className="absolute w-1 h-1 bg-purple-400 rounded-full animate-pulse" style={{top: '60%', left: '80%'}} />
-        <div className="absolute w-3 h-3 bg-green-400 rounded-full animate-pulse" style={{top: '80%', left: '20%'}} />
-        <div className="absolute w-1 h-1 bg-yellow-400 rounded-full animate-pulse" style={{top: '30%', left: '70%'}} />
+        <div
+          className="absolute w-2 h-2 bg-blue-400 rounded-full animate-pulse"
+          style={{ top: "20%", left: "10%" }}
+        />
+        <div
+          className="absolute w-1 h-1 bg-purple-400 rounded-full animate-pulse"
+          style={{ top: "60%", left: "80%" }}
+        />
+        <div
+          className="absolute w-3 h-3 bg-green-400 rounded-full animate-pulse"
+          style={{ top: "80%", left: "20%" }}
+        />
+        <div
+          className="absolute w-1 h-1 bg-yellow-400 rounded-full animate-pulse"
+          style={{ top: "30%", left: "70%" }}
+        />
       </div>
 
       <div className="relative z-10 w-full max-w-7xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-6">
           <div className="flex items-center justify-center gap-3 mb-4">
             <GamepadIcon className="w-8 h-8 text-purple-400" />
@@ -376,7 +419,7 @@ export default function GameCanvas() {
             </div>
             <div className="text-gray-300 text-sm">Score</div>
           </div>
-          
+
           <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-xl p-4 text-center backdrop-blur-sm">
             <Users className="w-6 h-6 mx-auto mb-2 text-blue-400" />
             <div className="text-blue-400 font-bold text-xl">
@@ -384,7 +427,7 @@ export default function GameCanvas() {
             </div>
             <div className="text-gray-300 text-sm">Alive</div>
           </div>
-          
+
           <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-xl p-4 text-center backdrop-blur-sm">
             <Zap className="w-6 h-6 mx-auto mb-2 text-purple-400" />
             <div className="text-purple-400 font-bold text-xl">
@@ -392,15 +435,29 @@ export default function GameCanvas() {
             </div>
             <div className="text-gray-300 text-sm">Objects</div>
           </div>
-          
-          <div className={`bg-gradient-to-br ${connected ? 'from-green-500/20 to-green-600/20 border-green-500/30' : 'from-red-500/20 to-red-600/20 border-red-500/30'} border rounded-xl p-4 text-center backdrop-blur-sm`}>
-            <div className={`w-4 h-4 rounded-full mx-auto mb-2 ${connected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-            <div className={`font-bold text-lg ${connected ? 'text-green-400' : 'text-red-400'}`}>
-              {connected ? 'ONLINE' : 'OFFLINE'}
+
+          <div
+            className={`bg-gradient-to-br ${
+              connected
+                ? "from-green-500/20 to-green-600/20 border-green-500/30"
+                : "from-red-500/20 to-red-600/20 border-red-500/30"
+            } border rounded-xl p-4 text-center backdrop-blur-sm`}
+          >
+            <div
+              className={`w-4 h-4 rounded-full mx-auto mb-2 ${
+                connected ? "bg-green-400 animate-pulse" : "bg-red-400"
+              }`}
+            />
+            <div
+              className={`font-bold text-lg ${
+                connected ? "text-green-400" : "text-red-400"
+              }`}
+            >
+              {connected ? "ONLINE" : "OFFLINE"}
             </div>
             <div className="text-gray-300 text-sm">Status</div>
           </div>
-          
+
           <div className="bg-gradient-to-br from-gray-500/20 to-gray-600/20 border border-gray-500/30 rounded-xl p-4 text-center backdrop-blur-sm">
             <button
               onClick={toggleFullscreen}
@@ -412,7 +469,7 @@ export default function GameCanvas() {
                 <Maximize className="w-6 h-6 text-white mb-2" />
               )}
               <div className="text-white font-bold text-lg">
-                {isFullscreen ? 'EXIT' : 'FULL'}
+                {isFullscreen ? "EXIT" : "FULL"}
               </div>
               <div className="text-gray-300 text-sm">Screen</div>
             </button>
@@ -434,10 +491,17 @@ export default function GameCanvas() {
                   GAME OVER
                 </div>
                 <div className="text-2xl mb-6 text-gray-300">
-                  Final Score: <span className="text-yellow-400 font-bold">{Math.floor(myPlayer?.score ?? 0)}</span>
+                  Final Score:{" "}
+                  <span className="text-yellow-400 font-bold">
+                    {Math.floor(myPlayer?.score ?? 0)}
+                  </span>
                 </div>
                 <div className="text-lg text-gray-400 animate-pulse">
-                  Press <span className="bg-gray-700 px-2 py-1 rounded font-mono">SPACE</span> to respawn
+                  Press{" "}
+                  <span className="bg-gray-700 px-2 py-1 rounded font-mono">
+                    SPACE
+                  </span>{" "}
+                  to respawn
                 </div>
               </div>
             </div>
@@ -453,19 +517,25 @@ export default function GameCanvas() {
             <div className="space-y-2 text-gray-300">
               <div className="flex justify-between">
                 <span>Movement:</span>
-                <span className="font-mono bg-gray-700 px-2 py-1 rounded text-sm">WASD / Arrow Keys</span>
+                <span className="font-mono bg-gray-700 px-2 py-1 rounded text-sm">
+                  WASD / Arrow Keys
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Respawn:</span>
-                <span className="font-mono bg-gray-700 px-2 py-1 rounded text-sm">SPACE</span>
+                <span className="font-mono bg-gray-700 px-2 py-1 rounded text-sm">
+                  SPACE
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Fullscreen:</span>
-                <span className="font-mono bg-gray-700 px-2 py-1 rounded text-sm">F11</span>
+                <span className="font-mono bg-gray-700 px-2 py-1 rounded text-sm">
+                  F11
+                </span>
               </div>
             </div>
           </div>
-          
+
           <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 backdrop-blur-sm border border-gray-700/50">
             <h3 className="font-bold text-white mb-4 text-xl flex items-center gap-2">
               <Zap className="w-5 h-5" />
