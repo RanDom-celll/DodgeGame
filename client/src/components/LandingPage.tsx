@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Gamepad2, Users, Zap, Trophy, Play, Plus, LogIn, Wifi, WifiOff } from 'lucide-react';
 import GameCanvas from './GameCanvas';
@@ -6,7 +6,6 @@ import GameCanvas from './GameCanvas';
 const SOCKET_URL = 'http://localhost:3000';
 
 interface LandingPageProps {}
-
 export default function LandingPage({}: LandingPageProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
@@ -16,7 +15,7 @@ export default function LandingPage({}: LandingPageProps) {
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
   const [error, setError] = useState('');
-  const [playerCount, setPlayerCount] = useState(0);
+  const [, setPlayerCount] = useState(0);
 
   useEffect(() => {
     const newSocket = io(SOCKET_URL);
@@ -60,7 +59,7 @@ export default function LandingPage({}: LandingPageProps) {
 
     try {
       socket.emit('createRoom', (res: { code: string }) => {
-        console.log('Room created:', res.code);
+        alert(`code is -> ${res.code}`)
         setRoomCode(res.code);
         
         socket.emit('joinRoom', res.code, (joinRes: { success: boolean; message?: string }) => {
@@ -150,7 +149,7 @@ export default function LandingPage({}: LandingPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-blue-600 flex items-center justify-center p-4">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{ top: '20%', left: '10%' }} />
         <div className="absolute w-1 h-1 bg-purple-400 rounded-full animate-pulse" style={{ top: '60%', left: '80%' }} />

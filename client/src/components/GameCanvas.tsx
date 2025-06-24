@@ -1,5 +1,9 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
-import { io, Socket } from "socket.io-client";
+import { useRef, useEffect, useState, useCallback } from "react";
+import { Socket } from "socket.io-client";
+import type { Player } from "../types/Player";
+import type { GameObject } from "../types/FallingObject";
+import type { GameState } from "../types/GameState";
+import type { Props } from "../types/Props";
 import {
   Maximize,
   Minimize,
@@ -9,41 +13,6 @@ import {
   Gamepad2,
   GamepadIcon,
 } from "lucide-react";
-
-interface Player {
-  id: string;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  alive: boolean;
-  score: number;
-  skin: string;
-  shieldUntil: number;
-  freezeUntil: number;
-  slowUntil: number;
-}
-
-interface GameObject {
-  id: string;
-  x: number;
-  y: number;
-  vy: number;
-  type: "block" | "shield" | "freeze" | "slow";
-  width: number;
-  height: number;
-}
-
-interface GameState {
-  players: Player[];
-  objects: GameObject[];
-  gameTime: number;
-}
-
-interface Props {
-  socket: Socket;
-  roomCode: string;
-}
 
 export default function GameCanvas({ socket, roomCode }: Props) {
   console.log("[GameCanvas] mount:", { roomCode, socketId: socket.id });
@@ -58,7 +27,7 @@ export default function GameCanvas({ socket, roomCode }: Props) {
   });
   const [gameSize, setGameSize] = useState({ width: 800, height: 600 });
   const [playerId, setPlayerId] = useState<string>("");
-  const [connected, setConnected] = useState(false);
+  const [connected] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [tooShort, setTooShort] = useState(false);
   const [keys, setKeys] = useState({
@@ -379,7 +348,7 @@ export default function GameCanvas({ socket, roomCode }: Props) {
       ) : (
         ""
       )}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute bg-black inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute w-2 h-2 bg-blue-400 rounded-full animate-pulse"
           style={{ top: "20%", left: "10%" }}
@@ -398,7 +367,7 @@ export default function GameCanvas({ socket, roomCode }: Props) {
         />
       </div>
 
-      <div className="relative z-10 w-full max-w-7xl mx-auto">
+      <div className="relative z-10 bg-black w-full max-w-7xl mx-auto">
         <div className="text-center mb-6">
           <div className="flex items-center justify-center gap-3 mb-4">
             <GamepadIcon className="w-8 h-8 text-purple-400" />

@@ -2,58 +2,13 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import { v4 as uuid } from "uuid";
+import { Player,GameObject,Rooms } from "./types/all";
+import { PORT,GAME_HEIGHT,GAME_WIDTH,PLAYER_SIZE,OBJECT_SIZE,PLAYER_SPEED,GRAVITY,SPAWN_RATE,TICK_RATE,DT,ROOM_CLEANUP_DELAY,skins } from "./utils/constants";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
-const PORT = 3000;
 
-const GAME_WIDTH = 800;
-const GAME_HEIGHT = 600;
-const PLAYER_SIZE = 32;
-const OBJECT_SIZE = 32;
-const PLAYER_SPEED = 300;
-const GRAVITY = 1500;
-const SPAWN_RATE = 0.1;
-const TICK_RATE = 20;
-const DT = 1 / TICK_RATE;
-const ROOM_CLEANUP_DELAY = 30000;
-
-interface Player {
-  id: string;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  alive: boolean;
-  score: number;
-  skin: string;
-  shieldUntil: number;
-  freezeUntil: number;
-  slowUntil: number;
-}
-
-interface GameObject {
-  id: string;
-  x: number;
-  y: number;
-  vy: number;
-  type: "block" | "shield" | "freeze" | "slow";
-  width: number;
-  height: number;
-}
-
-interface Rooms {
-  players: Map<string, Player>;
-  objects: Map<string, GameObject>;
-  lastSpawn: number;
-  gameTime: number;
-  createdAt: number;
-  lastActivity: number;
-  cleanupTimeout?: NodeJS.Timeout;
-}
-
-const skins = ["knight", "wizard", "archer", "rogue"];
 const room: Map<string, Rooms> = new Map();
 const socketToRoom: Map<string, string> = new Map();
 
