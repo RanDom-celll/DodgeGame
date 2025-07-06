@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { Gamepad2, Users, Zap, Trophy, Play, Plus, LogIn, Wifi, WifiOff } from 'lucide-react';
 import GameCanvas from './GameCanvas';
 
-const SOCKET_URL = 'http://localhost:3000';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL;
 
 interface LandingPageProps {}
 export default function LandingPage({}: LandingPageProps) {
