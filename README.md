@@ -1,4 +1,4 @@
-# 🎮 Dodger Arena
+# 🎮 Dodger Master
 
 A real-time multiplayer survival game built with **Socket.io**, **React + Vite**, and **Node.js**.
 
