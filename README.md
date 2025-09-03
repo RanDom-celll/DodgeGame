@@ -22,7 +22,7 @@ Players dodge falling blocks and collect power-ups. The last one standing wins! 
 
 - **Frontend**: React + Vite, TailwindCSS
 - **Backend**: Node.js + Express + Socket.io
-- **Realtime Transport**: WebSockets (via Socket.io)
+- **Realtime Transport**: WebSockets
 - **Game Loop**: Server-tick driven game state updates (20Hz)
 - **Room Logic**: In-memory per-room state with Socket.io rooms
 
