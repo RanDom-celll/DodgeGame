@@ -5,8 +5,8 @@ import GameCanvas from './GameCanvas';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL;
 
-interface LandingPageProps {}
-export default function LandingPage({}: LandingPageProps) {
+interface LandingPageProps { }
+export default function LandingPage({ }: LandingPageProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [currentView, setCurrentView] = useState<'landing' | 'game'>('landing');
@@ -48,7 +48,7 @@ export default function LandingPage({}: LandingPageProps) {
     };
   }, []);
 
-  const createRoom = async () => {
+  const createRoom = async (mode: "pvp" | "bot") => {
     if (!socket || !connected) {
       setError('Not connected to server');
       return;
@@ -58,10 +58,10 @@ export default function LandingPage({}: LandingPageProps) {
     setError('');
 
     try {
-      socket.emit('createRoom', (res: { code: string }) => {
+      socket.emit('createRoom', { mode }, (res: { code: string }) => {
         alert(`code is -> ${res.code}`)
         setRoomCode(res.code);
-        
+
         socket.emit('joinRoom', res.code, (joinRes: { success: boolean; message?: string }) => {
           if (joinRes.success) {
             socket.emit('join', res.code, (gameRes: { success: boolean; message?: string }) => {
@@ -100,7 +100,7 @@ export default function LandingPage({}: LandingPageProps) {
 
     try {
       const code = inputRoomCode.trim().toUpperCase();
-      
+
       socket.emit('joinRoom', code, (joinRes: { success: boolean; message?: string }) => {
         if (joinRes.success) {
           socket.emit('join', code, (gameRes: { success: boolean; message?: string }) => {
@@ -177,11 +177,10 @@ export default function LandingPage({}: LandingPageProps) {
         </div>
 
         <div className="mb-8 flex justify-center">
-          <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${
-            connected 
-              ? 'bg-green-500/20 border border-green-500/30 text-green-400' 
+          <div className={`flex items-center gap-3 px-6 py-3 rounded-full ${connected
+              ? 'bg-green-500/20 border border-green-500/30 text-green-400'
               : 'bg-red-500/20 border border-red-500/30 text-red-400'
-          }`}>
+            }`}>
             {connected ? <Wifi className="w-5 h-5" /> : <WifiOff className="w-5 h-5" />}
             <span className="font-semibold">
               {connected ? 'Connected to Server' : 'Disconnected from Server'}
@@ -195,13 +194,13 @@ export default function LandingPage({}: LandingPageProps) {
             <div className="text-purple-400 font-bold text-2xl mb-1">Survival</div>
             <div className="text-gray-300">Test your reflexes and endurance</div>
           </div>
-          
+
           <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-2xl p-6 text-center backdrop-blur-sm">
             <Users className="w-8 h-8 mx-auto mb-3 text-blue-400" />
             <div className="text-blue-400 font-bold text-2xl mb-1">Multiplayer</div>
             <div className="text-gray-300">Compete with friends online</div>
           </div>
-          
+
           <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 rounded-2xl p-6 text-center backdrop-blur-sm">
             <Zap className="w-8 h-8 mx-auto mb-3 text-green-400" />
             <div className="text-green-400 font-bold text-2xl mb-1">Power-ups</div>
@@ -222,28 +221,32 @@ export default function LandingPage({}: LandingPageProps) {
               <h2 className="text-2xl font-bold text-white mb-2">Create Room</h2>
               <p className="text-gray-400">Start a new game and invite friends</p>
             </div>
-            
-            <button
-              onClick={createRoom}
-              disabled={!connected || isCreatingRoom}
-              className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all transform ${
-                connected && !isCreatingRoom
-                  ? 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 hover:scale-105 shadow-lg hover:shadow-green-500/25'
-                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {isCreatingRoom ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Creating...
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-2">
-                  <Plus className="w-5 h-5" />
-                  Create New Room
-                </div>
-              )}
-            </button>
+<div className="flex flex-col gap-4">
+  <button
+    onClick={() => createRoom("pvp")}
+    disabled={!connected || isCreatingRoom}
+    className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all transform ${
+      connected && !isCreatingRoom
+        ? "bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 hover:scale-105 shadow-lg hover:shadow-green-500/25"
+        : "bg-gray-600 text-gray-400 cursor-not-allowed"
+    }`}
+  >
+    {isCreatingRoom ? "Creating..." : "Create Multiplayer Room"}
+  </button>
+
+  <button
+    onClick={() => createRoom("bot")}
+    disabled={!connected || isCreatingRoom}
+    className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all transform ${
+      connected && !isCreatingRoom
+        ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700 hover:scale-105 shadow-lg hover:shadow-purple-500/25"
+        : "bg-gray-600 text-gray-400 cursor-not-allowed"
+    }`}
+  >
+    {isCreatingRoom ? "Creating..." : "Play with Bot"}
+  </button>
+</div>
+
           </div>
 
           <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-8 backdrop-blur-sm border border-gray-700/50">
@@ -252,7 +255,7 @@ export default function LandingPage({}: LandingPageProps) {
               <h2 className="text-2xl font-bold text-white mb-2">Join Room</h2>
               <p className="text-gray-400">Enter a room code to join friends</p>
             </div>
-            
+
             <div className="space-y-4">
               <input
                 type="text"
@@ -263,15 +266,14 @@ export default function LandingPage({}: LandingPageProps) {
                 className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 maxLength={6}
               />
-              
+
               <button
                 onClick={joinRoom}
                 disabled={!connected || !inputRoomCode.trim() || isJoiningRoom}
-                className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all transform ${
-                  connected && inputRoomCode.trim() && !isJoiningRoom
+                className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all transform ${connected && inputRoomCode.trim() && !isJoiningRoom
                     ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 hover:scale-105 shadow-lg hover:shadow-blue-500/25'
                     : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                }`}
+                  }`}
               >
                 {isJoiningRoom ? (
                   <div className="flex items-center justify-center gap-2">
@@ -294,7 +296,7 @@ export default function LandingPage({}: LandingPageProps) {
             <Play className="w-6 h-6" />
             How to Play
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <h3 className="text-xl font-semibold text-white mb-4">Controls</h3>
@@ -313,7 +315,7 @@ export default function LandingPage({}: LandingPageProps) {
                 </div>
               </div>
             </div>
-            
+
             <div>
               <h3 className="text-xl font-semibold text-white mb-4">Power-ups</h3>
               <div className="space-y-3">
@@ -332,10 +334,10 @@ export default function LandingPage({}: LandingPageProps) {
               </div>
             </div>
           </div>
-          
+
           <div className="mt-6 pt-6 border-t border-gray-700">
             <p className="text-gray-300 text-center">
-              <strong className="text-white">Objective:</strong> Dodge falling red blocks while collecting power-ups. 
+              <strong className="text-white">Objective:</strong> Dodge falling red blocks while collecting power-ups.
               Survive as long as possible to achieve the highest score!
             </p>
           </div>

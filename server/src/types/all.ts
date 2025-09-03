@@ -10,6 +10,7 @@ export type Player = {
   shieldUntil: number;
   freezeUntil: number;
   slowUntil: number;
+  isBot: boolean;
 }
 
 export type GameObject = {

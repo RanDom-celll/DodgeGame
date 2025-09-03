@@ -2,8 +2,8 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import { v4 as uuid } from "uuid";
-import { Player,GameObject,Rooms } from "./types/all";
-import { PORT,GAME_HEIGHT,GAME_WIDTH,PLAYER_SIZE,OBJECT_SIZE,PLAYER_SPEED,GRAVITY,SPAWN_RATE,TICK_RATE,DT,ROOM_CLEANUP_DELAY,skins } from "./utils/constants";
+import { Player, GameObject, Rooms } from "./types/all";
+import { PORT, GAME_HEIGHT, GAME_WIDTH, PLAYER_SIZE, OBJECT_SIZE, PLAYER_SPEED, GRAVITY, SPAWN_RATE, TICK_RATE, DT, ROOM_CLEANUP_DELAY, skins } from "./utils/constants";
 
 const app = express();
 const server = http.createServer(app);
@@ -45,7 +45,7 @@ function updateRoomActivity(code: string) {
   const roomState = room.get(code);
   if (roomState) {
     roomState.lastActivity = Date.now();
-    
+
     if (roomState.players.size > 0 && roomState.cleanupTimeout) {
       clearTimeout(roomState.cleanupTimeout);
       roomState.cleanupTimeout = undefined;
@@ -59,7 +59,7 @@ const gameLoop = setInterval(() => {
       state.gameTime += DT;
       updateGame(state);
       updateRoomActivity(code);
-      
+
       io.to(code).emit("gameState", {
         players: Array.from(state.players.values()),
         objects: Array.from(state.objects.values()),
@@ -98,6 +98,9 @@ function updateGame(state: Rooms) {
 
   for (const [id, player] of state.players) {
     if (!player.alive) continue;
+    if (player.isBot && player.alive) {
+      updateBot(player, state);
+    }
 
     if (state.gameTime * 1000 < player.freezeUntil) {
       player.vx = 0;
@@ -118,6 +121,42 @@ function updateGame(state: Rooms) {
 
     player.score += DT * 10;
   }
+}
+
+function updateBot(bot: Player, state: Rooms) {
+  const nearestBlock = getNearestObject(bot, state.objects, "block");
+  bot.vx = 0;
+  bot.vy = 0;
+  if (nearestBlock) {
+    if (nearestBlock.x < bot.x) bot.vx = 5;
+    else bot.vx = -5;
+  } else {
+    bot.vx = Math.random() > 0.5 ? 1 : -1;
+  }
+  bot.x += bot.vx;
+  bot.y += bot.vy;
+  bot.x = Math.max(0, Math.min(GAME_WIDTH - PLAYER_SIZE, bot.x));
+  bot.y = Math.max(0, Math.min(GAME_HEIGHT - PLAYER_SIZE, bot.y));
+}
+
+function getNearestObject(
+  bot: Player,
+  objects: Map<string, GameObject>,
+  type: string
+) {
+  let nearest = null;
+  let minDist = Infinity;
+  for (const obj of objects.values()) {
+    if (obj.type !== type) continue;
+    const dx = obj.x - bot.x;
+    const dy = obj.y - bot.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = obj;
+    }
+  }
+  return nearest;
 }
 
 function spawnObject(state: Rooms) {
@@ -144,7 +183,7 @@ function spawnObject(state: Rooms) {
     width: OBJECT_SIZE,
     height: OBJECT_SIZE,
   };
-  
+
   state.objects.set(obj.id, obj);
 }
 
@@ -191,15 +230,31 @@ function handleCollision(player: Player, obj: GameObject, state: Rooms) {
 
 io.on("connection", (socket) => {
   console.log(`Player connected: ${socket.id}`);
-  
-  socket.on("createRoom", (cb: (res: { code: string }) => void) => {
+
+  socket.on("createRoom", (data: { mode: "pvp" | "bot" }, cb: (res: { code: string }) => void) => {
     const code = uuid().slice(0, 6).toUpperCase();
     const roomState = createRoomState();
     room.set(code, roomState);
     socket.join(code);
     socketToRoom.set(socket.id, code);
+    if (data.mode === "bot") {
+      const bot: Player = {
+        id: "bot-" + uuid().slice(0, 4),
+        x: GAME_WIDTH / 2,
+        y: GAME_HEIGHT - PLAYER_SIZE - 10,
+        vx: 0,
+        vy: 0,
+        alive: true,
+        score: 0,
+        skin: "wizard",
+        shieldUntil: 0,
+        freezeUntil: 0,
+        slowUntil: 0,
+        isBot: true,
+      };
+      roomState.players.set(bot.id, bot);
+    }
     updateRoomActivity(code);
-    console.log(`Room ${code} created by ${socket.id}`);
     cb({ code });
   });
 
@@ -211,13 +266,13 @@ io.on("connection", (socket) => {
     ) => {
       console.log(`${socket.id} attempting to join room ${code}`);
       let roomState = room.get(code);
-      
+
       if (!roomState) {
         console.log(`Room ${code} not found, creating new room`);
         roomState = createRoomState();
         room.set(code, roomState);
       }
-      
+
       socket.join(code);
       socketToRoom.set(socket.id, code);
       updateRoomActivity(code);
@@ -256,12 +311,13 @@ io.on("connection", (socket) => {
       shieldUntil: 0,
       freezeUntil: 0,
       slowUntil: 0,
+      isBot: false,
     };
 
     roomState.players.set(socket.id, player);
     updateRoomActivity(code);
     console.log(`Player ${socket.id} added to game in room ${code}. Total players: ${roomState.players.size}`);
-    
+
     socket.emit("gameInit", {
       width: GAME_WIDTH,
       height: GAME_HEIGHT,
@@ -276,7 +332,7 @@ io.on("connection", (socket) => {
     (code: string, input: { left: boolean; right: boolean; up: boolean; down: boolean }) => {
       const state = room.get(code);
       if (!state) return;
-      
+
       const player = state.players.get(socket.id);
       if (!player || !player.alive) return;
 
@@ -303,10 +359,10 @@ io.on("connection", (socket) => {
   socket.on("respawn", () => {
     const roomCode = socketToRoom.get(socket.id);
     if (!roomCode) return;
-    
+
     const roomState = room.get(roomCode);
     if (!roomState) return;
-    
+
     const player = roomState.players.get(socket.id);
     if (!player) return;
 
@@ -319,9 +375,20 @@ io.on("connection", (socket) => {
     player.shieldUntil = 0;
     player.freezeUntil = 0;
     player.slowUntil = 0;
-    
+    for (const bot of roomState.players.values()) {
+      if (bot.isBot && !bot.alive) {
+        bot.alive = true;
+        bot.x = GAME_WIDTH / 2 - PLAYER_SIZE / 2;
+        bot.y = GAME_HEIGHT - PLAYER_SIZE - 10;
+        bot.vx = 0;
+        bot.vy = 0;
+        bot.score = 0;
+        bot.shieldUntil = 0;
+        bot.freezeUntil = 0;
+        bot.slowUntil = 0;
+      }
+    }
     updateRoomActivity(roomCode);
-    console.log(`Player ${socket.id} respawned in room ${roomCode}`);
   });
 
   socket.on("leaveRoom", (code: string) => {
@@ -329,7 +396,7 @@ io.on("connection", (socket) => {
     if (roomState) {
       roomState.players.delete(socket.id);
       console.log(`Player ${socket.id} left room ${code}. Remaining players: ${roomState.players.size}`);
-      
+
       if (roomState.players.size === 0) {
         console.log(`Room ${code} is now empty, scheduling cleanup`);
         scheduleRoomCleanup(code);
@@ -341,14 +408,14 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log(`Player disconnected: ${socket.id}`);
-    
+
     const roomCode = socketToRoom.get(socket.id);
     if (roomCode) {
       const roomState = room.get(roomCode);
       if (roomState) {
         roomState.players.delete(socket.id);
         console.log(`Player ${socket.id} removed from room ${roomCode}. Remaining players: ${roomState.players.size}`);
-        
+
         if (roomState.players.size === 0) {
           console.log(`Room ${roomCode} is now empty, scheduling cleanup`);
           scheduleRoomCleanup(roomCode);
@@ -362,7 +429,7 @@ io.on("connection", (socket) => {
 setInterval(() => {
   const now = Date.now();
   const oldRoomThreshold = 24 * 60 * 60 * 1000;
-  
+
   for (const [code, roomState] of room.entries()) {
     if (now - roomState.lastActivity > oldRoomThreshold && roomState.players.size === 0) {
       console.log(`Cleaning up old inactive room ${code}`);
@@ -376,5 +443,5 @@ setInterval(() => {
 
 server.listen(PORT, () => {
   console.log(`Game server running on port ${PORT}`);
-  console.log(`Rooms will be kept alive for ${ROOM_CLEANUP_DELAY/1000} seconds after becoming empty`);
+  console.log(`Rooms will be kept alive for ${ROOM_CLEANUP_DELAY / 1000} seconds after becoming empty`);
 });
